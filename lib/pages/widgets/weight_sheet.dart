@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/weight_record.dart';
 import '../../providers/app_state.dart';
 import 'sheet_widgets.dart';
+import '../../widgets/pet_avatar.dart';
 
 void showWeightSheet(BuildContext context, WidgetRef ref, String petId) {
   showCupertinoModalPopup(
@@ -191,7 +192,19 @@ class _WeightSheetState extends ConsumerState<WeightSheet> {
           child: SheetChipsRow<String>(
             value: _petId,
             options: pets
-                .map((p) => MapEntry(p.id, '${p.avatar} ${p.name}'))
+                .map(
+                  (p) => MapEntry(
+                    p.id,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PetAvatar(avatar: p.avatar, size: 20, radius: 6),
+                        const SizedBox(width: 6),
+                        Text(p.name),
+                      ],
+                    ),
+                  ),
+                )
                 .toList(),
             onChanged: (v) => setState(() => _petId = v),
           ),

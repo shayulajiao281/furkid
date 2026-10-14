@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import 'widgets/weight_sheet.dart';
+import '../widgets/pet_avatar.dart';
 
 class WeightPage extends ConsumerStatefulWidget {
   const WeightPage({super.key});
@@ -152,12 +153,19 @@ class _WeightPageState extends ConsumerState<WeightPage> {
                   color: active ? AppColors.primary : AppColors.line,
                 ),
               ),
-              child: Text(
-                '${p.avatar} ${p.name}',
+              child: DefaultTextStyle(
                 style: TextStyle(
                   fontSize: 12.5,
                   color: active ? CupertinoColors.white : AppColors.muted,
                   fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PetAvatar(avatar: p.avatar, size: 20, radius: 6),
+                    const SizedBox(width: 6),
+                    Text(p.name),
+                  ],
                 ),
               ),
             ),

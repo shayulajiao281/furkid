@@ -5,6 +5,7 @@ import '../../models/reminder.dart';
 import '../../providers/app_state.dart';
 import '../../theme/app_colors.dart';
 import 'sheet_widgets.dart';
+import '../../widgets/pet_avatar.dart';
 
 const _types = [
   MapEntry('deworm', '🪱 驱虫'),
@@ -158,7 +159,19 @@ class _ReminderSheetState extends ConsumerState<ReminderSheet> {
           child: SheetChipsRow<String>(
             value: _petId,
             options: pets
-                .map((p) => MapEntry(p.id, '${p.avatar} ${p.name}'))
+                .map(
+                  (p) => MapEntry(
+                    p.id,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PetAvatar(avatar: p.avatar, size: 20, radius: 6),
+                        const SizedBox(width: 6),
+                        Text(p.name),
+                      ],
+                    ),
+                  ),
+                )
                 .toList(),
             onChanged: (v) => setState(() => _petId = v),
           ),

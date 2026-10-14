@@ -872,7 +872,7 @@ class SegControl<T> extends StatelessWidget {
 // =============================================================
 class SheetChipsRow<T> extends StatelessWidget {
   final T value;
-  final List<MapEntry<T, String>> options;
+  final List<MapEntry<T, Widget>> options; // ← Widget
   final ValueChanged<T> onChanged;
 
   const SheetChipsRow({
@@ -906,13 +906,14 @@ class SheetChipsRow<T> extends StatelessWidget {
                   color: active ? AppColors.primary : AppColors.line,
                 ),
               ),
-              child: Text(
-                e.value,
+              child: DefaultTextStyle(
+                // ← 包一层
                 style: TextStyle(
                   fontSize: 12.5,
                   color: active ? CupertinoColors.white : AppColors.muted,
                   fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                 ),
+                child: e.value,
               ),
             ),
           );

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../widgets/pet_avatar.dart';
 import 'widgets/pet_sheet.dart';
 
 class PetsPage extends ConsumerWidget {
@@ -186,19 +187,8 @@ class PetsPage extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    p.avatar,
-                    style: const TextStyle(fontSize: 28, height: 1),
-                  ),
-                ),
+                // ★ 头像：自动区分 emoji / 图片
+                PetAvatar(avatar: p.avatar, size: 54, radius: 16),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -217,7 +207,8 @@ class PetsPage extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          if (p.gender.isNotEmpty) ...[
+                          // ★ "未知"性别不显示 tag
+                          if (p.gender.isNotEmpty && p.gender != '未知') ...[
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(

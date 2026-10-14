@@ -8,6 +8,7 @@ import '../models/pet.dart';
 import '../models/reminder.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../widgets/pet_avatar.dart';
 import 'widgets/reminder_sheet.dart';
 
 // 提醒类型 → emoji
@@ -133,8 +134,20 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   // ---------------- 过滤 chips ----------------
   Widget _chipsRow(List<Pet> pets) {
     final items = <Widget>[
-      _chip(label: '全部', id: 'all'),
-      ...pets.map((p) => _chip(label: '${p.avatar} ${p.name}', id: p.id)),
+      _chip(label: const Text('全部'), id: 'all'),
+      ...pets.map(
+        (p) => _chip(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PetAvatar(avatar: p.avatar, size: 20, radius: 6),
+              const SizedBox(width: 6),
+              Text(p.name),
+            ],
+          ),
+          id: p.id,
+        ),
+      ),
     ];
     return SizedBox(
       height: 32,
@@ -147,7 +160,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
     );
   }
 
-  Widget _chip({required String label, required String id}) {
+  Widget _chip({required Widget label, required String id}) {
     final active = _filter == id;
     return GestureDetector(
       onTap: () => setState(() => _filter = id),
@@ -162,13 +175,13 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
             width: 1,
           ),
         ),
-        child: Text(
-          label,
+        child: DefaultTextStyle(
           style: TextStyle(
             fontSize: 12.5,
             color: active ? CupertinoColors.white : AppColors.muted,
             fontWeight: active ? FontWeight.w600 : FontWeight.w400,
           ),
+          child: label,
         ),
       ),
     );
@@ -254,9 +267,8 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   ) {
     // 找到宠物
     final pet = state.pets.where((p) => p.id == r.petId).toList();
-    final petName = pet.isNotEmpty
-        ? '${pet.first.avatar}${pet.first.name}'
-        : '';
+    // ★ 只显示名字，不拼 avatar（避免图片路径显示成长链接）
+    final petName = pet.isNotEmpty ? pet.first.name : '';
 
     // 状态文本 + 颜色
     String status;
