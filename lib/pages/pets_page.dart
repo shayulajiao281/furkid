@@ -175,100 +175,109 @@ class PetsPage extends ConsumerWidget {
             ),
           ],
         ),
-        child: GestureDetector(
-          onTap: () => showPetSheet(context, ref, p),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: AppColors.cardShadow,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ★ 头像：自动区分 emoji / 图片
-                PetAvatar(avatar: p.avatar, size: 54, radius: 16),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              p.name,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.text,
-                                height: 1.2,
-                              ),
-                            ),
-                          ),
-                          // ★ "未知"性别不显示 tag
-                          if (p.gender.isNotEmpty && p.gender != '未知') ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primarySoft,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
+        child: Builder(
+          builder: (slideContext) => GestureDetector(
+            onTap: () {
+              final slide = Slidable.of(slideContext);
+              if (slide != null && slide.animation.value > 0.01) {
+                slide.close(); // ← 侧滑打开，关闭
+              } else {
+                showPetSheet(context, ref, p); // ← 侧滑关闭，开编辑
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: AppColors.cardShadow,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ★ 头像：自动区分 emoji / 图片
+                  PetAvatar(avatar: p.avatar, size: 54, radius: 16),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
                               child: Text(
-                                p.gender,
+                                p.name,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primary,
-                                  height: 1.4,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.text,
+                                  height: 1.2,
                                 ),
                               ),
                             ),
+                            // ★ "未知"性别不显示 tag
+                            if (p.gender.isNotEmpty && p.gender != '未知') ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  p.gender,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        [
-                          p.breed,
-                          p.birthday,
-                        ].where((e) => e != null && e.isNotEmpty).join(' · '),
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.muted,
-                          height: 1.3,
                         ),
-                      ),
-                      const SizedBox(height: 9),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F9FC),
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Text.rich(
-                          TextSpan(
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: AppColors.muted,
-                              height: 1.45,
-                            ),
-                            children: metaSpans,
+                        const SizedBox(height: 3),
+                        Text(
+                          [
+                            p.breed,
+                            p.birthday,
+                          ].where((e) => e != null && e.isNotEmpty).join(' · '),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.muted,
+                            height: 1.3,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 9),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FC),
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Text.rich(
+                            TextSpan(
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.muted,
+                                height: 1.45,
+                              ),
+                              children: metaSpans,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
