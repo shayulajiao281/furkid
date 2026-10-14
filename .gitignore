@@ -1,0 +1,67 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code（可选，想提交 launch.json 就保留下面的注释）
+# .vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ==================== 下面这些是默认模板缺的 ====================
+
+# Android 本机配置 & 签名（绝对不能提交）
+android/local.properties
+android/key.properties
+*.jks
+*.keystore
+android/.gradle/
+
+# iOS CocoaPods & Flutter 生成文件（绝对不能提交）
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+
+# macOS（Flutter 桌面项目用，移动端项目可以留着不影响）
+**/Flutter/ephemeral/
+**/.symlinks/
+
+# 系统
+Thumbs.db
