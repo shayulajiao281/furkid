@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/reminder.dart';
 import '../../providers/app_state.dart';
@@ -103,6 +104,47 @@ class _ReminderSheetState extends ConsumerState<ReminderSheet> {
     Navigator.pop(context);
   }
 
+  // ---------------- 删除确认框 ----------------
+  void _confirmDelete(BuildContext context) {
+    final r = widget.reminder;
+    if (r == null) return;
+
+    // 找到关联宠物名
+    final pets = ref.read(appStateProvider).pets;
+    final pet = pets.where((p) => p.id == r.petId).toList();
+    final petName = pet.isNotEmpty ? '「${pet.first.name}」的' : '';
+
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('删除提醒'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '确定要删除${petName}「${r.title}」吗？\n删除后不可恢复。',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx); // 关确认框
+              HapticFeedback.mediumImpact();
+              ref.read(appStateProvider.notifier).deleteReminder(r.id);
+              Navigator.pop(context); // 关弹层
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pets = ref.watch(appStateProvider).pets;
@@ -204,12 +246,7 @@ class _ReminderSheetState extends ConsumerState<ReminderSheet> {
           GhostButton(
             text: '删除提醒',
             danger: true,
-            onTap: () {
-              ref
-                  .read(appStateProvider.notifier)
-                  .deleteReminder(widget.reminder!.id);
-              Navigator.pop(context);
-            },
+            onTap: () => _confirmDelete(context),
           ),
       ],
     );

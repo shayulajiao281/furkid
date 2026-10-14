@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import 'widgets/pet_sheet.dart';
@@ -9,7 +11,6 @@ class PetsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ← ref 在这里
     final state = ref.watch(appStateProvider);
     final pets = state.pets;
     final notifier = ref.read(appStateProvider.notifier);
@@ -18,60 +19,57 @@ class PetsPage extends ConsumerWidget {
       color: AppColors.bg,
       child: SafeArea(
         bottom: false,
-        child: pets.isEmpty
-            ? _empty(context, ref) // ← 传 ref
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        child: Column(
+          children: [
+            // ============ 固定的顶部 ============
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 14),
-                    child: Row(
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '我的宠物',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                  height: 1.25,
-                                  color: AppColors.text,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '共 ${pets.length} 只宝贝',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.muted,
-                                ),
-                              ),
-                            ],
+                        const Text(
+                          '我的宠物',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            height: 1.25,
+                            color: AppColors.text,
                           ),
                         ),
-                        _addButton(
-                          onTap: () => showPetSheet(context, ref, null),
+                        const SizedBox(height: 3),
+                        Text(
+                          pets.isEmpty ? '还没有档案哦' : '共 ${pets.length} 只宝贝',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  // ↓ 这里必须把 ref 传给 _petCard
-                  ...List.generate(
-                    pets.length,
-                    (i) => _petCard(
-                      context,
-                      ref, // ← 传 ref
-                      notifier,
-                      state,
-                      pets[i],
-                    ),
-                  ),
+                  _addButton(onTap: () => showPetSheet(context, ref, null)),
                 ],
               ),
+            ),
+
+            // ============ 只有列表滚动 ============
+            Expanded(
+              child: pets.isEmpty
+                  ? _empty(context, ref)
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                      itemCount: pets.length,
+                      itemBuilder: (_, i) =>
+                          _petCard(context, ref, notifier, state, pets[i]),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -94,25 +92,19 @@ class PetsPage extends ConsumerWidget {
             ),
           ],
         ),
-        child: const Center(
-          child: Text(
-            '＋',
-            style: TextStyle(
-              color: CupertinoColors.white,
-              fontSize: 23,
-              height: 1,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
+        child: const Icon(
+          CupertinoIcons.plus,
+          size: 24,
+          color: CupertinoColors.white,
         ),
       ),
     );
   }
 
-  // ↓ 签名加上 WidgetRef ref
+  // ---------------- 宠物卡片（带左滑删除） ----------------
   Widget _petCard(
     BuildContext context,
-    WidgetRef ref, // ← 新增参数
+    WidgetRef ref,
     AppStateNotifier notifier,
     AppState state,
     dynamic p,
@@ -160,19 +152,38 @@ class PetsPage extends ConsumerWidget {
       );
     }
 
-    return GestureDetector(
-      onTap: () => showPetSheet(context, ref, p), // ← 现在 ref 有定义了
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 11),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: AppColors.cardShadow,
-        ),
-        child: Stack(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: Slidable(
+        key: ValueKey(p.id),
+        endActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: 0.22,
           children: [
-            Row(
+            SlidableAction(
+              onPressed: (_) {
+                HapticFeedback.mediumImpact();
+                _confirmDelete(context, notifier, p);
+              },
+              backgroundColor: AppColors.red,
+              foregroundColor: CupertinoColors.white,
+              icon: CupertinoIcons.delete,
+              label: '删除',
+              borderRadius: BorderRadius.circular(18),
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+        child: GestureDetector(
+          onTap: () => showPetSheet(context, ref, p),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: AppColors.cardShadow,
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
@@ -266,33 +277,51 @@ class PetsPage extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 24),
               ],
             ),
-            Positioned(
-              top: -8,
-              right: -8,
-              child: GestureDetector(
-                onTap: () => notifier.deletePet(p.id),
-                child: const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Center(
-                    child: Icon(
-                      CupertinoIcons.xmark,
-                      size: 15,
-                      color: Color(0xFFCCD1E0),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  // ---------------- 删除确认框 ----------------
+  void _confirmDelete(
+    BuildContext context,
+    AppStateNotifier notifier,
+    dynamic p,
+  ) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('删除宠物档案'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '确定要删除「${p.name}」吗？\n'
+            '该宠物的所有提醒和体重记录也会一起删除。',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx);
+              notifier.deletePet(p.id);
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- 空态 ----------------
   Widget _empty(BuildContext context, WidgetRef ref) => Center(
     child: Padding(
       padding: const EdgeInsets.all(20),

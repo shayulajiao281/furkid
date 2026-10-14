@@ -1,5 +1,8 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:furkid/utils/toast.dart';
 import 'package:go_router/go_router.dart';
 import '../models/pet.dart';
 import '../models/reminder.dart';
@@ -38,12 +41,11 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
         bottom: false,
         child: pets.isEmpty
             ? _emptyNoPets(context)
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            : Column(
                 children: [
-                  // ============ Page Head ============
+                  // ============ 固定顶部：标题 + 加号 ============
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 14),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -79,13 +81,21 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                     ),
                   ),
 
-                  // ============ 过滤 chips ============
-                  _chipsRow(pets),
+                  // ============ 固定 chips ============
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _chipsRow(pets),
+                  ),
 
                   const SizedBox(height: 14),
 
-                  // ============ 列表 ============
-                  ..._buildList(context, notifier, state),
+                  // ============ 只有列表滚动 ============
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      children: _buildList(context, notifier, state),
+                    ),
+                  ),
                 ],
               ),
       ),
@@ -111,16 +121,10 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
             ),
           ],
         ),
-        child: const Center(
-          child: Text(
-            '＋',
-            style: TextStyle(
-              color: CupertinoColors.white,
-              fontSize: 23,
-              height: 1,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
+        child: const Icon(
+          CupertinoIcons.plus,
+          size: 20,
+          color: CupertinoColors.white,
         ),
       ),
     );
@@ -132,7 +136,6 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
       _chip(label: '全部', id: 'all'),
       ...pets.map((p) => _chip(label: '${p.avatar} ${p.name}', id: p.id)),
     ];
-
     return SizedBox(
       height: 32,
       child: ListView.separated(
@@ -286,124 +289,245 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
     final repeatTxt = r.repeat > 0 ? ' · 重复' : '';
     final subPrefix = petName.isNotEmpty ? '$petName · ' : '';
 
-    return GestureDetector(
-      onTap: () => showReminderSheet(context, ref, r),
-      child: Opacity(
-        opacity: r.done ? 0.55 : 1.0,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 9),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppColors.cardShadow,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              children: [
-                // 左侧色条（3px）
-                if (leftBar != null)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: Container(width: 3, color: leftBar),
-                  ),
-                // 主内容
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-                  child: Row(
-                    children: [
-                      // 图标 42×42
-                      Container(
-                        width: 42,
-                        height: 42,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF6F7FB),
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: Text(
-                          _typeIcons[r.type] ?? '📌',
-                          style: const TextStyle(fontSize: 20, height: 1),
-                        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Slidable(
+        key: ValueKey(r.id),
+        endActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: 0.22,
+          children: [
+            SlidableAction(
+              onPressed: (_) {
+                HapticFeedback.mediumImpact();
+                _confirmDelete(context, notifier, r);
+              },
+              backgroundColor: AppColors.red,
+              foregroundColor: CupertinoColors.white,
+              icon: CupertinoIcons.delete,
+              label: '删除',
+              borderRadius: BorderRadius.circular(16),
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+        child: GestureDetector(
+          onTap: () => showReminderSheet(context, ref, r),
+          child: Opacity(
+            opacity: r.done ? 0.55 : 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppColors.cardShadow,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: [
+                    // 左侧色条（3px）
+                    if (leftBar != null)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(width: 3, color: leftBar),
                       ),
-                      const SizedBox(width: 11),
-                      // 文字区
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              r.title,
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.text,
-                                height: 1.25,
-                              ),
+                    // 主内容
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+                      child: Row(
+                        children: [
+                          // 图标 42×42
+                          Container(
+                            width: 42,
+                            height: 42,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF6F7FB),
+                              borderRadius: BorderRadius.circular(13),
                             ),
-                            const SizedBox(height: 3),
-                            Text.rich(
-                              TextSpan(
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  color: AppColors.muted,
-                                  height: 1.4,
-                                ),
-                                children: [
-                                  TextSpan(text: subPrefix),
-                                  TextSpan(text: '${r.date}$repeatTxt · '),
-                                  TextSpan(
-                                    text: status,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: statusColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // 勾选按钮 29×29
-                      GestureDetector(
-                        onTap: () => notifier.toggleReminder(r.id),
-                        child: Container(
-                          width: 29,
-                          height: 29,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: r.done
-                                ? AppColors.green
-                                : CupertinoColors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: r.done
-                                  ? AppColors.green
-                                  : const Color(0xFFDFE3EE),
-                              width: 2,
+                            child: Text(
+                              _typeIcons[r.type] ?? '📌',
+                              style: const TextStyle(fontSize: 20, height: 1),
                             ),
                           ),
-                          child: r.done
-                              ? const Icon(
-                                  CupertinoIcons.checkmark,
-                                  size: 14,
-                                  color: CupertinoColors.white,
-                                )
-                              : null,
-                        ),
+                          const SizedBox(width: 11),
+                          // 文字区
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  r.title,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.text,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.muted,
+                                      height: 1.4,
+                                    ),
+                                    children: [
+                                      TextSpan(text: subPrefix),
+                                      TextSpan(text: '${r.date}$repeatTxt · '),
+                                      TextSpan(
+                                        text: status,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // 勾选按钮 29×29
+                          GestureDetector(
+                            onTap: () => _onCheckTap(context, notifier, r),
+                            child: Container(
+                              width: 29,
+                              height: 29,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: r.done
+                                    ? AppColors.green
+                                    : CupertinoColors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: r.done
+                                      ? AppColors.green
+                                      : const Color(0xFFDFE3EE),
+                                  width: 2,
+                                ),
+                              ),
+                              child: r.done
+                                  ? const Icon(
+                                      CupertinoIcons.checkmark,
+                                      size: 14,
+                                      color: CupertinoColors.white,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  // ---------------- 勾选按钮点击处理 ----------------
+  void _onCheckTap(
+    BuildContext context,
+    AppStateNotifier notifier,
+    Reminder r,
+  ) {
+    // 已完成 → 直接取消，不弹确认框
+    if (r.done) {
+      final msg = notifier.toggleReminder(r.id);
+      HapticFeedback.selectionClick();
+      showToast(context, msg);
+      return;
+    }
+
+    // 未完成 → 弹确认框
+    final isRepeat = r.repeat > 0;
+
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(r.title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            isRepeat ? '确认这次已完成？\n下次会在 ${_nextDateText(r)} 提醒你' : '确认已完成？',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final msg = notifier.toggleReminder(r.id);
+              HapticFeedback.mediumImpact();
+              showToast(context, msg);
+            },
+            child: const Text('完成'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- 删除确认框 ----------------
+  void _confirmDelete(
+    BuildContext context,
+    AppStateNotifier notifier,
+    Reminder r,
+  ) {
+    // 找到关联宠物名
+    final state = ref.read(appStateProvider);
+    final pet = state.pets.where((p) => p.id == r.petId).toList();
+    final petName = pet.isNotEmpty ? '「${pet.first.name}」的' : '';
+
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('删除提醒'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '确定要删除${petName}「${r.title}」吗？\n删除后不可恢复。',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx);
+              notifier.deleteReminder(r.id);
+              HapticFeedback.mediumImpact();
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 计算重复提醒的下次日期（用于确认框文案）
+  String _nextDateText(Reminder r) {
+    try {
+      final d = DateTime.parse(r.date).add(Duration(days: r.repeat));
+      return fmtDate(d);
+    } catch (_) {
+      return '';
+    }
   }
 
   // ---------------- 空态：无宠物 ----------------

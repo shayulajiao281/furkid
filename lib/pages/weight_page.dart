@@ -1,4 +1,6 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
@@ -34,12 +36,11 @@ class _WeightPageState extends ConsumerState<WeightPage> {
       color: AppColors.bg,
       child: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        child: Column(
           children: [
-            // ============ Page head ============
+            // ============ 固定顶部：标题 + 加号 ============
             Padding(
-              padding: const EdgeInsets.fromLTRB(0, 16, 0, 14),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -75,24 +76,34 @@ class _WeightPageState extends ConsumerState<WeightPage> {
               ),
             ),
 
-            // ============ 宠物切换 chips ============
-            _chipsRow(pets),
+            // ============ 固定 chips ============
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _chipsRow(pets),
+            ),
 
             const SizedBox(height: 14),
 
-            // ============ Hero ============
-            _hero(latest, prev),
-
-            const SizedBox(height: 13),
-
-            // ============ 历史 ============
-            if (recs.isNotEmpty) _history(notifier, recs),
+            // ============ 只有内容滚动 ============
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                children: [
+                  _hero(latest, prev),
+                  const SizedBox(height: 13),
+                  _chartCard(recs),
+                  const SizedBox(height: 13),
+                  if (recs.isNotEmpty) _history(notifier, recs),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ---------------- 加号按钮 ----------------
   Widget _addButton({required VoidCallback onTap}) => GestureDetector(
     onTap: onTap,
     child: Container(
@@ -110,19 +121,15 @@ class _WeightPageState extends ConsumerState<WeightPage> {
           ),
         ],
       ),
-      child: const Center(
-        child: Text(
-          '＋',
-          style: TextStyle(
-            color: CupertinoColors.white,
-            fontSize: 23,
-            height: 1,
-          ),
-        ),
+      child: const Icon(
+        CupertinoIcons.plus,
+        size: 20,
+        color: CupertinoColors.white,
       ),
     ),
   );
 
+  // ---------------- chips ----------------
   Widget _chipsRow(List<dynamic> pets) {
     return SizedBox(
       height: 32,
@@ -160,7 +167,7 @@ class _WeightPageState extends ConsumerState<WeightPage> {
     );
   }
 
-  // ---- Hero 卡片 (渐变 135deg #ff9a6b → #ff6b8a) ----
+  // ---------------- Hero ----------------
   Widget _hero(dynamic latest, dynamic prev) {
     final hasData = latest != null;
     final diff = (hasData && prev != null) ? (latest.value - prev.value) : 0.0;
@@ -177,7 +184,7 @@ class _WeightPageState extends ConsumerState<WeightPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x4DFF6B8A), // rgba(255,107,138,.3)
+            color: Color(0x4DFF6B8A),
             blurRadius: 26,
             offset: Offset(0, 12),
           ),
@@ -239,7 +246,199 @@ class _WeightPageState extends ConsumerState<WeightPage> {
     );
   }
 
-  // ---- 历史记录卡片 ----
+  // ---------------- 折线图卡片 ----------------
+  Widget _chartCard(List<dynamic> recs) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(15, 15, 15, 8),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '体重趋势',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.muted,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 180,
+            child: recs.length < 2 ? _chartEmpty() : _chart(recs),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chartEmpty() => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: const [
+        Text('📈', style: TextStyle(fontSize: 32, height: 1)),
+        SizedBox(height: 8),
+        Text(
+          '记录 2 次以上就能看到趋势曲线啦',
+          style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+        ),
+      ],
+    ),
+  );
+
+  Widget _chart(List<dynamic> recs) {
+    final spots = <FlSpot>[];
+    for (int i = 0; i < recs.length; i++) {
+      spots.add(FlSpot(i.toDouble(), recs[i].value.toDouble()));
+    }
+
+    final vals = recs.map((r) => r.value as double).toList();
+    double minY = vals.reduce((a, b) => a < b ? a : b);
+    double maxY = vals.reduce((a, b) => a > b ? a : b);
+    if (maxY == minY) {
+      maxY += 1;
+      minY -= 1;
+    }
+    final pad = (maxY - minY) * 0.25;
+    minY -= pad;
+    maxY += pad;
+
+    String labelOf(int i) {
+      final date = recs[i].date as String;
+      final parts = date.split('-');
+      return parts.length >= 3 ? '${parts[1]}/${parts[2]}' : date;
+    }
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: (recs.length - 1).toDouble(),
+        minY: minY,
+        maxY: maxY,
+        clipData: const FlClipData.all(),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: (maxY - minY) / 2,
+          getDrawingHorizontalLine: (value) =>
+              const FlLine(color: Color(0xFFEEF0F6), strokeWidth: 1),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 36,
+              interval: (maxY - minY) / 2,
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value.toStringAsFixed(1),
+                  style: const TextStyle(fontSize: 9, color: Color(0xFFA8AFC0)),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final i = value.toInt();
+                if (i < 0 || i >= recs.length) {
+                  return const SizedBox.shrink();
+                }
+                final show = i == 0 || i == recs.length - 1;
+                if (!show) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    labelOf(i),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFFA8AFC0),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => const Color(0xFF1E2231),
+            tooltipBorderRadius: BorderRadius.circular(10),
+            tooltipPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 6,
+            ),
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((t) {
+                final i = t.x.toInt();
+                final date = recs[i].date as String;
+                return LineTooltipItem(
+                  '$date\n${t.y.toStringAsFixed(1)} kg',
+                  const TextStyle(
+                    color: CupertinoColors.white,
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }).toList();
+            },
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            curveSmoothness: 0.28,
+            color: AppColors.primary,
+            barWidth: 2.6,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, _, __, i) {
+                final isLast = i == spots.length - 1;
+                return FlDotCirclePainter(
+                  radius: isLast ? 5 : 3.2,
+                  color: isLast ? AppColors.primary : CupertinoColors.white,
+                  strokeWidth: isLast ? 3 : 2,
+                  strokeColor: AppColors.primary,
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppColors.primary.withOpacity(0.26),
+                  AppColors.primary.withOpacity(0.0),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- 历史 ----------------
   Widget _history(AppStateNotifier notifier, List<dynamic> recs) {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -291,7 +490,7 @@ class _WeightPageState extends ConsumerState<WeightPage> {
                   ),
                   const SizedBox(width: 10),
                   GestureDetector(
-                    onTap: () => notifier.deleteWeight(r.id),
+                    onTap: () => _confirmDeleteWeight(notifier, r),
                     child: Container(
                       width: 22,
                       height: 22,
@@ -317,6 +516,39 @@ class _WeightPageState extends ConsumerState<WeightPage> {
     );
   }
 
+  // 删除体重确认
+  void _confirmDeleteWeight(AppStateNotifier notifier, dynamic r) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('删除记录'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '确定要删除 ${r.date} 的 ${r.value} kg 记录吗？',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx);
+              HapticFeedback.mediumImpact();
+              notifier.deleteWeight(r.id);
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- 空态 ----------------
   Widget _empty() => Container(
     color: AppColors.bg,
     child: const SafeArea(

@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/weight_record.dart';
 import '../../providers/app_state.dart';
@@ -36,20 +37,138 @@ class _WeightSheetState extends ConsumerState<WeightSheet> {
     super.dispose();
   }
 
-  void _save() {
-    final v = double.tryParse(_valueCtrl.text);
-    if (v == null || v <= 0) return;
-    ref
-        .read(appStateProvider.notifier)
-        .upsertWeight(
-          WeightRecord(
-            id: uid(),
-            petId: _petId,
-            date: fmtDate(_date),
-            value: v,
+  // ═══════════ 通用提示弹窗 ═══════════
+  void _alert(String message) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            message,
+            style: const TextStyle(fontSize: 14, height: 1.5),
           ),
-        );
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('好的'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _save() {
+    // ① 空输入 → 弹提示
+    final text = _valueCtrl.text.trim();
+    if (text.isEmpty) {
+      HapticFeedback.lightImpact();
+      _alert('请输入体重');
+      return;
+    }
+
+    // ② 非法输入 → 弹提示
+    final v = double.tryParse(text);
+    if (v == null || v <= 0) {
+      HapticFeedback.lightImpact();
+      _alert('请输入有效的体重');
+      return;
+    }
+
+    // ③ 检查当天是否已有记录
+    final state = ref.read(appStateProvider);
+    final dateStr = fmtDate(_date);
+    final existing = state.weights
+        .where((w) => w.petId == _petId && w.date == dateStr)
+        .toList();
+
+    if (existing.isNotEmpty) {
+      // 已有 → 弹覆盖确认框
+      _confirmOverwrite(v, dateStr, existing.first);
+    } else {
+      // 没有 → 直接保存
+      _doSave(v, dateStr, isOverwrite: false);
+    }
+  }
+
+  // 覆盖确认框
+  void _confirmOverwrite(double v, String dateStr, WeightRecord old) {
+    HapticFeedback.mediumImpact();
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('当天已有记录'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '$dateStr 已经记录了 ${old.value} kg\n是否覆盖为 ${v.toStringAsFixed(1)} kg？',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _doSave(v, dateStr, isOverwrite: true);
+            },
+            child: const Text('覆盖'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 真正保存
+  void _doSave(double v, String dateStr, {required bool isOverwrite}) {
+    final notifier = ref.read(appStateProvider.notifier);
+
+    // 覆盖时，先删除已有的
+    if (isOverwrite) {
+      final state = ref.read(appStateProvider);
+      final olds = state.weights
+          .where((w) => w.petId == _petId && w.date == dateStr)
+          .toList();
+      for (final old in olds) {
+        notifier.deleteWeight(old.id);
+      }
+    }
+
+    // 加新记录
+    notifier.upsertWeight(
+      WeightRecord(id: uid(), petId: _petId, date: dateStr, value: v),
+    );
+
+    // 关弹层
     Navigator.pop(context);
+
+    // 弹层关闭后延迟一点弹提示（此时用 context 应该没问题，
+    // 因为 State 还在，只是弹层被 pop 了）
+    // Future.delayed(const Duration(milliseconds: 250), () {
+    //   if (!mounted) return;
+    //   showCupertinoDialog(
+    //     context: context,
+    //     builder: (ctx) => CupertinoAlertDialog(
+    //       content: Padding(
+    //         padding: const EdgeInsets.only(top: 8),
+    //         child: Text(
+    //           isOverwrite ? '已覆盖当天记录' : '已保存 ✓',
+    //           style: const TextStyle(fontSize: 14),
+    //         ),
+    //       ),
+    //       actions: [
+    //         CupertinoDialogAction(
+    //           onPressed: () => Navigator.pop(ctx),
+    //           child: const Text('好的'),
+    //         ),
+    //       ],
+    //     ),
+    //   );
+    // });
   }
 
   @override

@@ -3,8 +3,8 @@ allprojects {
         maven { url = uri("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/") }
         maven { url = uri("https://mirrors.cloud.tencent.com/nexus/repository/google/") }
         maven { url = uri("https://mirrors.cloud.tencent.com/nexus/repository/gradle-plugin/") }
-        google()
-        mavenCentral()
+        // google()
+        // mavenCentral()
     }
 }
 

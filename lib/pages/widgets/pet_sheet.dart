@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/pet.dart';
 import '../../models/weight_record.dart';
@@ -63,6 +64,43 @@ class _PetSheetState extends ConsumerState<PetSheet> {
     _breedCtrl.dispose();
     _weightCtrl.dispose();
     super.dispose();
+  }
+
+  // ---------------- 删除确认框 ----------------
+  void _confirmDelete(BuildContext context) {
+    final pet = widget.pet;
+    if (pet == null) return;
+
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('删除宠物档案'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '确定要删除「${pet.name}」吗？\n'
+            '该宠物的所有提醒和体重记录也会一起删除。',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx); // 先关确认框
+              HapticFeedback.mediumImpact();
+              ref.read(appStateProvider.notifier).deletePet(pet.id);
+              Navigator.pop(context); // 再关弹层
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _save() {
@@ -172,10 +210,7 @@ class _PetSheetState extends ConsumerState<PetSheet> {
           GhostButton(
             text: '删除这只宠物',
             danger: true,
-            onTap: () {
-              ref.read(appStateProvider.notifier).deletePet(widget.pet!.id);
-              Navigator.pop(context);
-            },
+            onTap: () => _confirmDelete(context),
           ),
       ],
     );
