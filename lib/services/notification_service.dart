@@ -8,14 +8,14 @@ class NotificationService {
   static bool _inited = false;
 
   /// 所有提醒固定在这个时间通知
-  // static const int reminderHour = 9;
-  // static const int reminderMinute = 0;
+  static const int reminderHour = 9;
+  static const int reminderMinute = 0;
 
   // ⚠️ 测试用：当前时间 +2 分钟。测完改回 const int reminderHour = 9; reminderMinute = 0;
-  static int get reminderHour =>
-      DateTime.now().add(const Duration(minutes: 2)).hour;
-  static int get reminderMinute =>
-      DateTime.now().add(const Duration(minutes: 2)).minute;
+  // static int get reminderHour =>
+  //     DateTime.now().add(const Duration(minutes: 2)).hour;
+  // static int get reminderMinute =>
+  //     DateTime.now().add(const Duration(minutes: 2)).minute;
 
   /// 初始化
   static Future<void> init() async {
