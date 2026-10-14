@@ -29,6 +29,14 @@ class _WeightSheetState extends ConsumerState<WeightSheet> {
   void initState() {
     super.initState();
     _petId = widget.initialPetId;
+
+    // ★ 预填当前体重（该宠物最新一条记录的值）
+    final state = ref.read(appStateProvider);
+    final records = state.weights.where((w) => w.petId == _petId).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    if (records.isNotEmpty) {
+      _valueCtrl.text = records.last.value.toString();
+    }
   }
 
   @override

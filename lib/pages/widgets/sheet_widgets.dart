@@ -115,7 +115,7 @@ class SheetField extends StatelessWidget {
 }
 
 // =============================================================
-// 输入框：CupertinoTextField（Material TextField 在 CupertinoApp 下会崩）
+// 输入框：CupertinoTextField
 // =============================================================
 class SheetTextField extends StatefulWidget {
   final TextEditingController controller;
@@ -250,7 +250,7 @@ class SheetDateField extends StatelessWidget {
 }
 
 // =============================================================
-// 日历弹层（现代风格）
+// 日历弹层（支持左右滑动切月）
 // =============================================================
 class _CalendarPopup extends StatefulWidget {
   final DateTime initial;
@@ -268,8 +268,17 @@ class _CalendarPopup extends StatefulWidget {
 }
 
 class _CalendarPopupState extends State<_CalendarPopup> {
-  late DateTime _month; // 当前显示的月份（1 号）
-  late DateTime _selected; // 选中的日期
+  /// 基准月份（第 0 页对应的月份）
+  late DateTime _baseMonth;
+
+  /// 当前页索引
+  late int _pageIndex;
+
+  /// 选中的日期
+  late DateTime _selected;
+
+  /// 允许往前往后的月份数（前后各 5 年）
+  static const int _rangeMonths = 60;
 
   static const _weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   static const _monthNames = [
@@ -287,6 +296,8 @@ class _CalendarPopupState extends State<_CalendarPopup> {
     '12月',
   ];
 
+  late PageController _pageCtrl;
+
   @override
   void initState() {
     super.initState();
@@ -295,7 +306,19 @@ class _CalendarPopupState extends State<_CalendarPopup> {
       widget.initial.month,
       widget.initial.day,
     );
-    _month = DateTime(_selected.year, _selected.month, 1);
+
+    // 基准月 = 60 个月前
+    _baseMonth = DateTime(_selected.year, _selected.month - _rangeMonths, 1);
+    // 当前选中的月份对应的页 = 中间页
+    _pageIndex = _rangeMonths;
+
+    _pageCtrl = PageController(initialPage: _pageIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
   }
 
   bool _isSameDay(DateTime a, DateTime b) =>
@@ -308,21 +331,28 @@ class _CalendarPopupState extends State<_CalendarPopup> {
     return d.isAfter(m);
   }
 
+  /// 第 n 页对应的月份
+  DateTime _monthOfPage(int page) =>
+      DateTime(_baseMonth.year, _baseMonth.month + page, 1);
+
   void _prevMonth() {
-    setState(() {
-      _month = DateTime(_month.year, _month.month - 1, 1);
-    });
+    _pageCtrl.previousPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOut,
+    );
   }
 
   void _nextMonth() {
-    setState(() {
-      _month = DateTime(_month.year, _month.month + 1, 1);
-    });
+    _pageCtrl.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final currentMonth = _monthOfPage(_pageIndex);
     final today = DateTime.now();
 
     return Container(
@@ -351,7 +381,7 @@ class _CalendarPopupState extends State<_CalendarPopup> {
             child: Row(
               children: [
                 Text(
-                  '${_month.year}年 ${_monthNames[_month.month - 1]}',
+                  '${currentMonth.year}年 ${_monthNames[currentMonth.month - 1]}',
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -390,16 +420,27 @@ class _CalendarPopupState extends State<_CalendarPopup> {
           ),
           const SizedBox(height: 6),
 
-          // ---------- 日期网格 ----------
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _CalendarGrid(
-              month: _month,
-              selected: _selected,
-              today: today,
-              isDisabled: _isDisabled,
-              isSameDay: _isSameDay,
-              onPick: (d) => setState(() => _selected = d),
+          // ---------- 可左右滑动的日期网格 ----------
+          SizedBox(
+            height: 42 * 6.0 + 24,
+            child: PageView.builder(
+              controller: _pageCtrl,
+              itemCount: _rangeMonths * 2 + 1,
+              onPageChanged: (i) => setState(() => _pageIndex = i),
+              itemBuilder: (_, page) {
+                final month = _monthOfPage(page);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _CalendarGrid(
+                    month: month,
+                    selected: _selected,
+                    today: today,
+                    isDisabled: _isDisabled,
+                    isSameDay: _isSameDay,
+                    onPick: (d) => setState(() => _selected = d),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),
@@ -488,7 +529,7 @@ class _CalendarPopupState extends State<_CalendarPopup> {
 }
 
 // =============================================================
-// 日历网格
+// 日历网格（单月）
 // =============================================================
 class _CalendarGrid extends StatelessWidget {
   final DateTime month;
@@ -509,16 +550,12 @@ class _CalendarGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 本月第一天是星期几（0 = 周日）
     final firstWeekday = DateTime(month.year, month.month, 1).weekday % 7;
-    // 本月有多少天
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    // 上个月有多少天
     final prevMonthDays = DateTime(month.year, month.month, 0).day;
 
     final cells = <Widget>[];
 
-    // 前导：上月末尾
     for (int i = firstWeekday - 1; i >= 0; i--) {
       final d = prevMonthDays - i;
       cells.add(
@@ -528,13 +565,11 @@ class _CalendarGrid extends StatelessWidget {
         ),
       );
     }
-    // 本月
     for (int d = 1; d <= daysInMonth; d++) {
       cells.add(
         _buildDay(DateTime(month.year, month.month, d), isCurrentMonth: true),
       );
     }
-    // 后补：下月开头，凑满整周
     final totalCells = ((firstWeekday + daysInMonth + 6) ~/ 7) * 7;
     for (int d = 1; cells.length < totalCells; d++) {
       cells.add(
@@ -569,8 +604,8 @@ class _CalendarGrid extends StatelessWidget {
     return GestureDetector(
       onTap: disabled ? null : () => onPick(date),
       behavior: HitTestBehavior.opaque,
-      child: AspectRatio(
-        aspectRatio: 1,
+      child: SizedBox(
+        height: 42,
         child: Center(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
@@ -720,7 +755,7 @@ class SheetSelect<T> extends StatelessWidget {
 }
 
 // =============================================================
-// Emoji 选择器：44×44、radius14、gap 8、active 时主色边框 + 缩放
+// Emoji 选择器
 // =============================================================
 class EmojiPicker extends StatelessWidget {
   final List<String> options;
@@ -768,7 +803,7 @@ class EmojiPicker extends StatelessWidget {
 }
 
 // =============================================================
-// 分段控件：bg #f3f5f9、radius13、padding4、active 白底 + 阴影
+// 分段控件
 // =============================================================
 class SegControl<T> extends StatelessWidget {
   final T value;
@@ -888,7 +923,7 @@ class SheetChipsRow<T> extends StatelessWidget {
 }
 
 // =============================================================
-// 主按钮：radius14、padding14、shadow 0 8 18 主色 32%
+// 主按钮
 // =============================================================
 class PrimaryButton extends StatelessWidget {
   final String text;
@@ -931,7 +966,7 @@ class PrimaryButton extends StatelessWidget {
 }
 
 // =============================================================
-// 幽灵按钮：透明底、muted 色（danger 时红色）
+// 幽灵按钮
 // =============================================================
 class GhostButton extends StatelessWidget {
   final String text;

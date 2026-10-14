@@ -42,7 +42,7 @@ class _PetSheetState extends ConsumerState<PetSheet> {
   late TextEditingController _weightCtrl;
   String _avatar = '🐶';
   String _gender = '公';
-  DateTime _birthday = DateTime(2023, 5, 12);
+  DateTime _birthday = DateTime.now();
 
   @override
   void initState() {
@@ -53,8 +53,25 @@ class _PetSheetState extends ConsumerState<PetSheet> {
     _weightCtrl = TextEditingController();
     _avatar = p?.avatar ?? '🐶';
     _gender = p?.gender ?? '公';
+
+    // if (p != null && p.birthday.isNotEmpty) {
+    //   _birthday = DateTime.tryParse(p.birthday) ?? DateTime.now();
+    // }
+    // ★ 生日默认：编辑时用原值；新建时用今天
     if (p != null && p.birthday.isNotEmpty) {
-      _birthday = DateTime.tryParse(p.birthday) ?? DateTime(2023, 5, 12);
+      _birthday = DateTime.tryParse(p.birthday) ?? DateTime.now();
+    } else {
+      _birthday = DateTime.now();
+    }
+
+    // ★ 编辑时预填当前体重
+    if (p != null) {
+      final state = ref.read(appStateProvider);
+      final records = state.weights.where((w) => w.petId == p.id).toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+      if (records.isNotEmpty) {
+        _weightCtrl.text = records.last.value.toString();
+      }
     }
   }
 
@@ -122,12 +139,31 @@ class _PetSheetState extends ConsumerState<PetSheet> {
     } else {
       notifier.addPet(data);
     }
-
+    // ★ 处理体重：如果改了，更新最新那条记录；没有记录就新增
     final w = double.tryParse(_weightCtrl.text);
     if (w != null && w > 0) {
-      notifier.upsertWeight(
-        WeightRecord(id: uid(), petId: data.id, date: todayStr(), value: w),
-      );
+      final state = ref.read(appStateProvider);
+      final records =
+          state.weights.where((rec) => rec.petId == data.id).toList()
+            ..sort((a, b) => a.date.compareTo(b.date));
+
+      if (records.isEmpty) {
+        // 无记录 → 加今天这条
+        notifier.upsertWeight(
+          WeightRecord(id: uid(), petId: data.id, date: todayStr(), value: w),
+        );
+      } else {
+        // 有记录 → 更新【最新那条】
+        final latest = records.last;
+        notifier.upsertWeight(
+          WeightRecord(
+            id: latest.id,
+            petId: data.id,
+            date: latest.date,
+            value: w,
+          ),
+        );
+      }
     }
 
     Navigator.pop(context);
