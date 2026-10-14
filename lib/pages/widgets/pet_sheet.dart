@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:furkid/theme/app_colors.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../models/pet.dart';
 import '../../models/weight_record.dart';
 import '../../providers/app_state.dart';
+import '../../widgets/pet_avatar.dart';
 import 'sheet_widgets.dart';
 
 const _avatars = [
@@ -24,7 +29,7 @@ const _avatars = [
 void showPetSheet(BuildContext context, WidgetRef ref, Pet? pet) {
   showCupertinoModalPopup(
     context: context,
-    barrierColor: const Color(0x6B0C0F19), // rgba(12,15,25,.42)
+    barrierColor: const Color(0x6B0C0F19),
     builder: (_) => PetSheet(pet: pet),
   );
 }
@@ -41,7 +46,7 @@ class _PetSheetState extends ConsumerState<PetSheet> {
   late TextEditingController _breedCtrl;
   late TextEditingController _weightCtrl;
   String _avatar = '🐶';
-  String _gender = '公';
+  String _gender = '未知';
   DateTime _birthday = DateTime.now();
 
   @override
@@ -52,19 +57,16 @@ class _PetSheetState extends ConsumerState<PetSheet> {
     _breedCtrl = TextEditingController(text: p?.breed ?? '');
     _weightCtrl = TextEditingController();
     _avatar = p?.avatar ?? '🐶';
-    _gender = p?.gender ?? '公';
+    _gender = p?.gender ?? '未知';
 
-    // if (p != null && p.birthday.isNotEmpty) {
-    //   _birthday = DateTime.tryParse(p.birthday) ?? DateTime.now();
-    // }
-    // ★ 生日默认：编辑时用原值；新建时用今天
+    // 生日默认：编辑时用原值；新建时用今天
     if (p != null && p.birthday.isNotEmpty) {
       _birthday = DateTime.tryParse(p.birthday) ?? DateTime.now();
     } else {
       _birthday = DateTime.now();
     }
 
-    // ★ 编辑时预填当前体重
+    // 编辑时预填当前体重
     if (p != null) {
       final state = ref.read(appStateProvider);
       final records = state.weights.where((w) => w.petId == p.id).toList()
@@ -81,6 +83,32 @@ class _PetSheetState extends ConsumerState<PetSheet> {
     _breedCtrl.dispose();
     _weightCtrl.dispose();
     super.dispose();
+  }
+
+  // ---------------- 从相册选头像 ----------------
+  Future<void> _pickFromGallery() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      // 复制到 App 私有目录，防止系统清理临时文件
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'pet_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final savedPath = '${dir.path}/$fileName';
+      await File(picked.path).copy(savedPath);
+
+      if (!mounted) return;
+      setState(() => _avatar = savedPath);
+    } catch (e) {
+      if (!mounted) return;
+      // 出错时忽略
+    }
   }
 
   // ---------------- 删除确认框 ----------------
@@ -108,10 +136,10 @@ class _PetSheetState extends ConsumerState<PetSheet> {
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () {
-              Navigator.pop(ctx); // 先关确认框
+              Navigator.pop(ctx);
               HapticFeedback.mediumImpact();
               ref.read(appStateProvider.notifier).deletePet(pet.id);
-              Navigator.pop(context); // 再关弹层
+              Navigator.pop(context);
             },
             child: const Text('删除'),
           ),
@@ -139,7 +167,8 @@ class _PetSheetState extends ConsumerState<PetSheet> {
     } else {
       notifier.addPet(data);
     }
-    // ★ 处理体重：如果改了，更新最新那条记录；没有记录就新增
+
+    // 处理体重
     final w = double.tryParse(_weightCtrl.text);
     if (w != null && w > 0) {
       final state = ref.read(appStateProvider);
@@ -148,12 +177,10 @@ class _PetSheetState extends ConsumerState<PetSheet> {
             ..sort((a, b) => a.date.compareTo(b.date));
 
       if (records.isEmpty) {
-        // 无记录 → 加今天这条
         notifier.upsertWeight(
           WeightRecord(id: uid(), petId: data.id, date: todayStr(), value: w),
         );
       } else {
-        // 有记录 → 更新【最新那条】
         final latest = records.last;
         notifier.upsertWeight(
           WeightRecord(
@@ -172,16 +199,64 @@ class _PetSheetState extends ConsumerState<PetSheet> {
   @override
   Widget build(BuildContext context) {
     final title = widget.pet != null ? '编辑宠物档案' : '添加宠物档案';
+    final isImageAvatar = PetAvatar.isImagePath(_avatar);
 
     return SheetShell(
       title: title,
       children: [
         SheetField(
           label: '选择头像',
-          child: EmojiPicker(
-            options: _avatars,
-            value: _avatar,
-            onChanged: (v) => setState(() => _avatar = v),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 顶部：当前头像预览 + 从相册选择按钮
+              Row(
+                children: [
+                  PetAvatar(avatar: _avatar, size: 56, radius: 16),
+                  const SizedBox(width: 12),
+                  // 从相册选
+                  GestureDetector(
+                    onTap: _pickFromGallery,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            CupertinoIcons.photo_on_rectangle,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '从相册选择',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // 下方：Emoji 快捷选择
+              EmojiPicker(
+                options: _avatars,
+                value: isImageAvatar ? '' : _avatar,
+                onChanged: (v) => setState(() => _avatar = v),
+              ),
+            ],
           ),
         ),
         SheetField(
@@ -206,7 +281,11 @@ class _PetSheetState extends ConsumerState<PetSheet> {
                 label: '性别',
                 child: SegControl<String>(
                   value: _gender,
-                  options: const [MapEntry('公', '公'), MapEntry('母', '母')],
+                  options: const [
+                    MapEntry('未知', '未知'),
+                    MapEntry('公', '公'),
+                    MapEntry('母', '母'),
+                  ],
                   onChanged: (v) => setState(() => _gender = v),
                 ),
               ),

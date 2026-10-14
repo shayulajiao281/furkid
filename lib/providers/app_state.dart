@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pet.dart';
@@ -138,12 +139,43 @@ class AppStateNotifier extends Notifier<AppState> {
     _persist();
   }
 
+  // void deletePet(String id) {
+  //   // ★ 先取消该宠物所有提醒的通知
+  //   for (final r in state.reminders.where((r) => r.petId == id)) {
+  //     NotificationService.cancel(_notifId(r.id));
+  //   }
+
+  //   state = AppState(
+  //     pets: state.pets.where((e) => e.id != id).toList(),
+  //     reminders: state.reminders.where((r) => r.petId != id).toList(),
+  //     weights: state.weights.where((w) => w.petId != id).toList(),
+  //   );
+  //   _persist();
+  // }
+
   void deletePet(String id) {
-    // ★ 先取消该宠物所有提醒的通知
+    // ① 删除头像图片文件（如果是图片路径）
+    final pets = state.pets.where((p) => p.id == id).toList();
+    if (pets.isNotEmpty) {
+      final avatar = pets.first.avatar;
+      // 判断是不是文件路径（含 / 或 \）
+      if (avatar.isNotEmpty &&
+          (avatar.contains('/') || avatar.contains('\\'))) {
+        try {
+          final f = File(avatar);
+          if (f.existsSync()) f.deleteSync();
+        } catch (_) {
+          // 删除失败忽略，不影响数据删除
+        }
+      }
+    }
+
+    // ② 取消该宠物所有提醒的通知
     for (final r in state.reminders.where((r) => r.petId == id)) {
       NotificationService.cancel(_notifId(r.id));
     }
 
+    // ③ 从 state 里移除数据
     state = AppState(
       pets: state.pets.where((e) => e.id != id).toList(),
       reminders: state.reminders.where((r) => r.petId != id).toList(),
